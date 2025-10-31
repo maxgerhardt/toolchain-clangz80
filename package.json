@@ -1,0 +1,24 @@
+{
+  "name": "toolchain-clangz80",
+  "version": "1.0.0",
+  "description": "eZ80 toolchain based on Clang, supporting Z80 and eZ80 compilation",
+  "keywords": [
+    "toolchain",
+    "build tools",
+    "compiler",
+    "assembler",
+    "linker",
+    "ez80",
+    "z80",
+    "clang"
+  ],
+  "license": "MIT",
+  "system": [
+    "windows_x86",
+    "windows_amd64"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maxgerhardt/platform-zilogz80"
+  }
+}
