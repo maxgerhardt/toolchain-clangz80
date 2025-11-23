@@ -9,6 +9,7 @@ V = @
 AGONDEV_TOOLCHAIN ?= $(shell agondev-config --prefix)
 TOOLBINDIR=$(AGONDEV_TOOLCHAIN)/bin
 INCLUDEDIR=$(AGONDEV_TOOLCHAIN)/include
+PROJECTINCLUDEDIR=./include
 LINKERCONFIG=$(AGONDEV_TOOLCHAIN)/config/linker.conf
 LIBDIR=$(AGONDEV_TOOLCHAIN)/lib
 PROJECTLIBDIR=./lib
@@ -20,11 +21,12 @@ TARGET=ez80-none-elf
 # Tools and flags
 ## Compiler
 CC=$(TOOLBINDIR)/ez80-none-elf-clang
-CFLAGS=-target $(TARGET) -DAGONDEV -Oz -Wa,-march=$(ARCH) -I $(INCLUDEDIR)
+CFLAGS=-nostdinc -I$(PROJECTINCLUDEDIR) -isystem $(INCLUDEDIR) -target $(TARGET) -DAGONDEV -Oz -Wa,-march=$(ARCH) -fno-threadsafe-statics
+CXXFLAGS=$(CFLAGS) -isystem $(INCLUDEDIR)/c++
 
 ## Assembler
 ASM=$(TOOLBINDIR)/ez80-none-elf-as
-ASMFLAGS=-march=$(ARCH)
+ASMFLAGS=-march=$(ARCH) -I $(INCLUDEDIR)
 
 ## Linker
 LINKER=$(TOOLBINDIR)/ez80-none-elf-ld
@@ -38,7 +40,7 @@ else
 endif
 MEMCONFIG=-defsym=RAM_START=$(RAM_START) -defsym=RAM_SIZE=$(RAM_SIZE)
 LINKERFLAGS=$(MEMCONFIG) $(LINKER_ARG) $(LINKER_EXIT) -Map=$(BINDIR)/$(NAME).map -T $(LINKERCONFIG) --oformat binary -o 
-LINKERLIBFLAGS=-L$(PROJECTLIBDIR) $(LIBS) -L$(LIBDIR) -\( -l c -l cxx -l agon -l crt -l fp -\) 
+LINKERLIBFLAGS=-L$(PROJECTLIBDIR) $(LIBS) -L$(LIBDIR) -l agon 
 SETPROGNAME=$(TOOLBINDIR)/agondev-setname
 
 ## Archiver
@@ -49,6 +51,8 @@ ARFLAGS=rcs
 SRCDIR=src
 OBJDIR=obj
 BINDIR=bin
+# Intermediate linker binary - no program name set yet
+LINKBINARY=$(BINDIR)/$(NAME).noname.bin
 # Final binary
 BINARY=$(BINDIR)/$(NAME).bin
 # Final library
@@ -63,10 +67,19 @@ OBJS=$(patsubst $(SRCDIR)/%.asm, $(OBJDIR)/%.o, $(shell find $(SRCDIR) -name '*.
 
 # Default rule
 all: $(BINDIR) $(BINARY)
+	@echo [Done]
+
+# Final binary
+$(BINARY): $(BINDIR) $(LINKBINARY)
 	@echo [Start address $(RAM_START)]
 	@echo [Setting name \'$(NAME).bin\' in binary]
+	@cp $(LINKBINARY) $(BINARY)
 	$(V)$(SETPROGNAME) $(BINARY) >/dev/null
-	@echo [Done]
+
+# Temporary 'program.bin' linked binary
+$(LINKBINARY): $(BINDIR) $(OBJS)
+	@echo [Linking $(LINKBINARY)]
+	$(V)$(LINKER) $(LINKERFLAGS)$@ $(OBJS) $(LINKERLIBFLAGS)
 
 # Create a library of all project objects
 lib: $(BINDIR) $(LIBRARY)
@@ -75,10 +88,6 @@ lib: $(BINDIR) $(LIBRARY)
 $(LIBRARY):$(OBJS)
 	@echo [Creating library $(LIBRARY)]
 	$(V)$(AR) $(ARFLAGS) $(LIBRARY) $(OBJS)
-
-$(BINARY):$(OBJS)
-	@echo [Linking $(BINARY)]
-	$(V)$(LINKER) $(LINKERFLAGS)$@ $(OBJS) $(LINKERLIBFLAGS)
 
 # Compile each .c file into .o file
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
@@ -89,7 +98,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp
 	@echo [compiling $<]
 	@mkdir -p $(dir $@)
-	$(V)$(CC) $(CFLAGS) $< -c -o $@
+	$(V)$(CC) $(CXXFLAGS) $< -c -o $@
 # Assemble each .s file into .o file
 $(OBJDIR)/%.o: $(SRCDIR)/%.s
 	@echo [assembling $<]
@@ -106,8 +115,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.src
 	@mkdir -p $(dir $@)
 	$(V)$(ASM) $(ASMFLAGS) $< -o $@
 
-#upload: $(BINDIR) $(BINARY)
-upload: all
+upload: $(BINDIR) $(BINARY)
 ifeq ($(SERIALPORT),)
 	@echo [No SERIALPORT in Makefile - autodetect]
 	@SERIALPORT=auto

@@ -2,8 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include <agon/vdp_vdu.h>
-#include <agon/vdp_keyboard.h>
+#include <agon/vdp.h>
 #include <agon/timer.h>
 
 void print_bits(uint8_t input) {
